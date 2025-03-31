@@ -1,0 +1,187 @@
+import pandas as pd
+import numpy as np
+from scipy import stats
+import seaborn as sns
+
+# Hypothesis testing: Chi-Square Test within the Eniac case study
+
+In this notebook we perform a chi-square test with the data from the Eniac case study, applying a post-hoc correction to perform pairwise tests and find the true winner.
+
+## 1.&nbsp;State the Null Hypothesis and the Alternative Hypothesis.
+
+Null Hypothesis ($H_0$): The click-through rate for all versions of the website is equal.
+
+Alternative Hypothesis ($H_A$): The click-through rate for at least one version of the website differs.
+
+
+## 2.&nbsp; Select an appropriate significance level alpha ($\alpha$).
+
+It was decided that a relatively high alpha was acceptable in this case
+
+alpha = 0.05
+
+## 3.&nbsp; Collect data that is random and independent
+
+The important pieces of information (clicks on each element of interest & visits on each page) are scattered around. Let's collect them.
+
+Importing the csv's
+
+# Element list eniac_a.csv
+url = 'https://drive.google.com/file/d/1x4DwDVc7uA2eIMEkmujmv81SfANjm6GC/view?usp=drive_link'
+path = 'https://drive.google.com/uc?export=download&id='+url.split('/')[-2]
+eniac_a_df = pd.read_csv(path)
+
+# Element list eniac_b.csv
+url = 'https://drive.google.com/file/d/1Z4vLwetcGbk75cRihAp_rVtQ879vPYhu/view?usp=drive_link'
+path = 'https://drive.google.com/uc?export=download&id='+url.split('/')[-2]
+eniac_b_df = pd.read_csv(path)
+
+# Element list eniac_c.csv
+url = 'https://drive.google.com/file/d/1mFk5UkygtUAmwx3KD3y8WRQVkF959YCv/view?usp=drive_link'
+path = 'https://drive.google.com/uc?export=download&id='+url.split('/')[-2]
+eniac_c_df = pd.read_csv(path)
+
+# Element list eniac_d.csv
+url = 'https://drive.google.com/file/d/1e5ldQGnyQIL5UWYe1nDiKReNr1NGNvzg/view?usp=drive_link'
+path = 'https://drive.google.com/uc?export=download&id='+url.split('/')[-2]
+eniac_d_df = pd.read_csv(path)
+
+How many clicks did each element get?
+
+eniac_a_df
+
+eniac_a_df["Name"]
+
+eniac_a_clicks = eniac_a_df.loc[eniac_a_df["Name"]=="SHOP NOW", "No. clicks"].iloc[0]
+eniac_b_clicks = eniac_b_df.loc[eniac_b_df["Name"]=="SHOP NOW", "No. clicks"].iloc[0]
+eniac_c_clicks = eniac_c_df.loc[eniac_c_df["Name"]=="SEE DEALS", "No. clicks"].iloc[0]
+eniac_d_clicks = eniac_d_df.loc[eniac_d_df["Name"]=="SEE DEALS", "No. clicks"].iloc[0]
+
+eniac_c_clicks
+
+How many visits did each page get (they are in the last column of the second row, we read them manually)?
+
+eniac_a_df
+
+eniac_a_df.iloc[1, -1]
+
+eniac_a_visits = 25326
+eniac_b_visits = 24747
+eniac_c_visits = 24876
+eniac_d_visits = 25233
+
+From the above information, we can calculate the number of visitors who didn't click on the button
+
+eniac_a_no_click = eniac_a_visits - eniac_a_clicks
+eniac_b_no_click = eniac_b_visits - eniac_b_clicks
+eniac_c_no_click = eniac_c_visits - eniac_c_clicks
+eniac_d_no_click = eniac_d_visits - eniac_d_clicks
+
+Now we can make a contingency table that shows the clicks and no clicks for each version of the website
+
+clicks = [eniac_a_clicks, eniac_b_clicks, eniac_c_clicks, eniac_d_clicks]
+noclicks = [eniac_a_no_click, eniac_b_no_click, eniac_c_no_click, eniac_d_no_click]
+
+observed_results = pd.DataFrame(data = [clicks, noclicks],
+                                columns = ["Version_A", "Version_B", "Version_C", "Version_D"],
+                                index = ["Click", "No-click"])
+
+observed_results
+
+## 4.&nbsp; Calculate the test result
+
+chisq, pvalue, df, expected = stats.chi2_contingency(observed_results)
+
+pvalue
+
+## 5.&nbsp; Interpret the test result
+
+if pvalue > alpha:
+  print("Do not reject the null hypothesis")
+else:
+  print("Reject the null hypothesis")
+
+Since the p-value is (much) smaller than alpha, we reject the Null Hypothesis.
+
+> Remember: **If p is low, the Null must go!**
+
+This means that at least one of the four different versions performed significantly better or worse than the others.
+
+# But how do we decide who's the winner?
+
+If you feel very brave, read about [Post Hoc Tests](https://alanarnholt.github.io/PDS-Bookdown2/post-hoc-tests-1.html) and find out whether we can declare a clear winner.
+
+> **In brief:** Post hoc tests, also known as post hoc comparisons or pairwise comparisons, are statistical procedures used in conjunction with a Chi-Squared test to determine specific differences between groups or conditions after obtaining significant results from the Chi-Squared test. Once the Chi-Squared test reveals a significant difference among the variables being examined, post hoc tests are employed to identify which specific groups or categories are significantly different from each other.
+
+We have 6 possible dual tests to perform:
+* Version A - Version B
+* Version A - Version C
+* Version A - Version D
+* Version B - Version C
+* Version B - Version D
+* Version C - Version D
+
+The level of alpha we selected for the chi-squared test cannot be same for the dual tests. If there was an error of 5% in each of the tests, this would sum up to much more than the 5% total we set for alpha, so we will need to be much more restrictive in the dual tests. Therefore, we will split the value of alpha equally among the dual tests to be performed.
+
+possible_combinations = 6
+alpha_post_hoc = alpha / possible_combinations
+alpha_post_hoc
+
+Before we begin, let's have a look at the click through rates to see the relative success of each version
+
+# click-through rates
+eniac_a_ctr = eniac_a_clicks / eniac_a_visits
+eniac_b_ctr = eniac_b_clicks / eniac_b_visits
+eniac_c_ctr = eniac_c_clicks / eniac_c_visits
+eniac_d_ctr = eniac_d_clicks / eniac_d_visits
+
+# display as DataFrame
+rates = [eniac_a_ctr, eniac_b_ctr, eniac_c_ctr, eniac_d_ctr]
+names = ["Version_A", "Version_B", "Version_C", "Version_D"]
+
+ctr_df = pd.DataFrame({"rates": rates, "names": names})
+ctr_df.sort_values("rates", ascending=False)
+
+It appears that the two white buttons have achieved the highest level of success. However, to gain a comprehensive understanding of statistical significance, we will conduct a post hoc test across all versions. Nonetheless, our primary emphasis should be on analysing the discrepancy between the white "SEE DEALS" and the white "SHOP NOW" buttons, as well as the disparity between these two and the remaining versions.
+
+# empty dictionary to fill with our results
+stat_significant_dict = {
+                        "Version_A": [],
+                        "Version_B": [],
+                        "Version_C": [],
+                        "Version_D": []
+                         }
+
+# compare each version to each other version
+for i in observed_results.columns:
+  for j in observed_results.columns:
+    # use scipy to find the p-value of each pair
+    chisq, pvalue, df, expected = stats.chi2_contingency(observed_results.loc[:, [i, j]], correction=False)
+    # boolean: if the p-value is lower than alpha, our result is statistically significant
+    stat_significant_dict[i].append(pvalue < alpha_post_hoc)
+
+# create a DataFrame of results
+stat_significant_df = pd.DataFrame(stat_significant_dict,
+                                   index=observed_results.columns)
+
+# create a heatmap from the DataFrame & red/green colour palette
+red_green_palette = sns.diverging_palette(10, 120, n=2, s=70, l=50)
+ax = sns.heatmap(stat_significant_df, cmap=red_green_palette)
+
+# Manually specify colorbar labelling after it's been generated
+colorbar = ax.collections[0].colorbar
+colorbar.set_ticks([0.25, 0.75])
+colorbar.set_ticklabels(['False', 'True'])
+
+# Add a title to the heatmap
+ax.set_title("Statistical Significance in Pairwise Tests: True or False?", pad=10);
+
+stat_significant_df
+
+Analysing our heatmap, it is evident that the version with the highest click-through rate, `Version_C`, exhibits a statistically significant difference when compared Versions B and D, but not to `Version_A`, which possesses the second-highest click-through rate. As a result, declaring a clear winner based on post hoc tests becomes challenging, therefore we can only say that both `Version_C` and `Version_A` are the winners.
+
+However, if a definitive winner is required, additional steps need to be implemented. This is where we transition from the realm of statistics to the business world. The following actions can help in determining the version to be featured on the website in the future:
+ - Consider other metrics alongside click-through rate.
+ - Incorporate qualitative research findings.
+ - Seek input from subject-matter experts.
+ - Redesign the experiment and conduct it once more.
